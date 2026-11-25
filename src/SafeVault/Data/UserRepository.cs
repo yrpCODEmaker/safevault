@@ -133,12 +133,18 @@ public sealed class UserRepository : IDisposable
     /// </summary>
     public IReadOnlyList<User> SearchUsers(string searchTerm)
     {
-        if (string.IsNullOrWhiteSpace(searchTerm))
+        if (string.IsNullOrWhiteSpace(searchTerm) || searchTerm.Contains('\0', StringComparison.Ordinal))
         {
             return [];
         }
 
-        string escaped = EscapeLikePattern(searchTerm.Trim());
+        string trimmed = searchTerm.Trim();
+        if (trimmed.Length > 100)
+        {
+            return [];
+        }
+
+        string escaped = EscapeLikePattern(trimmed);
         using var command = _connection.CreateCommand();
         command.CommandText = """
             SELECT UserID, Username, Email, Role, PasswordHash

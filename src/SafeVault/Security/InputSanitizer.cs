@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Mail;
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace SafeVault.Security;
@@ -13,20 +14,22 @@ public static partial class InputSanitizer
     public const int MaxUsernameLength = 50;
     public const int MaxEmailLength = 100;
 
-    [GeneratedRegex(@"^[a-zA-Z0-9_.-]{3,50}$", RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"^[a-zA-Z0-9_.-]{3,50}$", RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 250)]
     private static partial Regex UsernameAllowlistRegex();
 
-    [GeneratedRegex(@"^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$", RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$", RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 250)]
     private static partial Regex EmailAllowlistRegex();
 
     [GeneratedRegex(
         @"<\s*/?\s*(script|img|svg|iframe|object|embed|link|style|body|input|form|meta|base)\b|javascript\s*:|vbscript\s*:|data\s*:\s*text/html|\bon[a-z]+\s*=|<\s*[a-zA-Z][^>]*>",
-        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
+        matchTimeoutMilliseconds: 250)]
     private static partial Regex XssPatternRegex();
 
     [GeneratedRegex(
         @"(--|/\*|\*/|['""`;\0])|\b(union\s+(all\s+)?select|select\s+.+\s+from|insert\s+into|update\s+.+\s+set|delete\s+from|drop\s+(table|database)|alter\s+table|exec(\s|\()|xp_cmdshell|waitfor\s+delay|sleep\s*\()\b|\bor\s+1\s*=\s*1\b",
-        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
+        matchTimeoutMilliseconds: 250)]
     private static partial Regex SqlInjectionPatternRegex();
 
     /// <summary>
@@ -115,6 +118,73 @@ public static partial class InputSanitizer
     public static string SanitizeForHtml(string? input)
     {
         return string.IsNullOrEmpty(input) ? string.Empty : WebUtility.HtmlEncode(input);
+    }
+
+    /// <summary>
+    /// Strips null bytes and non-whitespace control characters, normalizes newlines, and HTML-encodes user-generated content.
+    /// </summary>
+    public static string SanitizeUserContent(string? input)
+    {
+        if (string.IsNullOrEmpty(input))
+        {
+            return string.Empty;
+        }
+
+        string normalizedNewlines = input
+            .Replace("\r\n", "\n", StringComparison.Ordinal)
+            .Replace('\r', '\n');
+
+        var cleaned = new StringBuilder(normalizedNewlines.Length);
+        foreach (char ch in normalizedNewlines)
+        {
+            if (ch == '\0')
+            {
+                continue;
+            }
+
+            if (char.IsControl(ch) && ch is not ('\n' or '\t'))
+            {
+                continue;
+            }
+
+            cleaned.Append(ch);
+        }
+
+        return WebUtility.HtmlEncode(cleaned.ToString());
+    }
+
+    /// <summary>
+    /// Validates and canonicalizes a URL for safe rendering, allowing only single-slash relative paths or http/https URLs.
+    /// </summary>
+    public static string SanitizeUrl(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            return string.Empty;
+        }
+
+        string trimmed = url.Trim();
+        if (ContainsControlChars(trimmed) ||
+            trimmed.Contains('\\', StringComparison.Ordinal) ||
+            trimmed.StartsWith("//", StringComparison.Ordinal))
+        {
+            return string.Empty;
+        }
+
+        if (trimmed.StartsWith('/'))
+        {
+            return Uri.TryCreate(trimmed, UriKind.Relative, out _) ? trimmed : string.Empty;
+        }
+
+        if (Uri.TryCreate(trimmed, UriKind.Absolute, out Uri? uri) &&
+            (string.Equals(uri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase) ||
+             string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)) &&
+            !string.IsNullOrEmpty(uri.Host))
+        {
+            return uri.AbsoluteUri;
+        }
+
+        return string.Empty;
     }
 
     /// <summary>

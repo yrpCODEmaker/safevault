@@ -1,3 +1,4 @@
+using System.Text;
 using BCrypt.Net;
 
 namespace SafeVault.Security;
@@ -8,11 +9,12 @@ namespace SafeVault.Security;
 public static class PasswordHasher
 {
     public const int MinPasswordLength = 8;
-    public const int MaxPasswordLength = 128;
+    public const int MaxPasswordLength = 72;
+    public const int MaxPasswordBytes = 72;
     public const int DefaultWorkFactor = 11;
 
     /// <summary>
-    /// Validates minimum length and complexity requirements for user passwords.
+    /// Validates minimum length, BCrypt 72-byte upper bound, and complexity requirements for user passwords.
     /// </summary>
     public static bool ValidatePasswordStrength(string? password, out string error)
     {
@@ -22,9 +24,9 @@ public static class PasswordHasher
             return false;
         }
 
-        if (password.Length is < MinPasswordLength or > MaxPasswordLength)
+        if (password.Length < MinPasswordLength || Encoding.UTF8.GetByteCount(password) > MaxPasswordBytes)
         {
-            error = $"Password must be between {MinPasswordLength} and {MaxPasswordLength} characters.";
+            error = $"Password must be at least {MinPasswordLength} characters and at most {MaxPasswordBytes} UTF-8 bytes.";
             return false;
         }
 
@@ -67,15 +69,22 @@ public static class PasswordHasher
             throw new ArgumentException("Password cannot be null or whitespace.", nameof(password));
         }
 
+        if (Encoding.UTF8.GetByteCount(password) > MaxPasswordBytes)
+        {
+            throw new ArgumentException($"Password must not exceed {MaxPasswordBytes} UTF-8 bytes.", nameof(password));
+        }
+
         return BCrypt.Net.BCrypt.HashPassword(password, workFactor);
     }
 
     /// <summary>
-    /// Verifies a plaintext password against a stored BCrypt hash, returning false on mismatch or invalid hashes.
+    /// Verifies a plaintext password against a stored BCrypt hash, returning false on mismatch, oversized inputs, or invalid hashes.
     /// </summary>
     public static bool VerifyPassword(string? password, string? passwordHash)
     {
-        if (string.IsNullOrWhiteSpace(password) || string.IsNullOrWhiteSpace(passwordHash))
+        if (string.IsNullOrWhiteSpace(password) ||
+            string.IsNullOrWhiteSpace(passwordHash) ||
+            Encoding.UTF8.GetByteCount(password) > MaxPasswordBytes)
         {
             return false;
         }

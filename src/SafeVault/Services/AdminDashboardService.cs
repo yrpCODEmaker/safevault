@@ -34,7 +34,11 @@ public sealed class AdminDashboardService
         var summaries = new List<AuthenticatedUser>(allUsers.Count);
         foreach (User user in allUsers)
         {
-            summaries.Add(new AuthenticatedUser(user.UserId, user.Username, user.Email, user.Role));
+            summaries.Add(new AuthenticatedUser(
+                user.UserId,
+                InputSanitizer.SanitizeForHtml(user.Username),
+                InputSanitizer.SanitizeForHtml(user.Email),
+                user.Role));
         }
 
         return new AdminDashboardSnapshot(summaries.Count, summaries);

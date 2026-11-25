@@ -42,11 +42,11 @@ public static class AuthorizationService
     }
 
     /// <summary>
-    /// Evaluates whether the user is permitted to access the specified route (fail-closed for unknown routes).
+    /// Evaluates whether the user is permitted to access the specified route (fail-closed for unknown or malformed routes).
     /// </summary>
     public static bool AuthorizeRoute(AuthenticatedUser? user, string route)
     {
-        if (route is null)
+        if (route is null || ContainsUnsafeRouteTokens(route))
         {
             return false;
         }
@@ -59,6 +59,24 @@ public static class AuthorizationService
             "/admin" or "/admin/dashboard" or "/admin/users" => HasRole(user, UserRoles.Admin),
             _ => false
         };
+    }
+
+    private static bool ContainsUnsafeRouteTokens(string route)
+    {
+        foreach (char ch in route)
+        {
+            if (char.IsControl(ch))
+            {
+                return true;
+            }
+        }
+
+        return route.Contains("..", StringComparison.Ordinal)
+            || route.Contains('\\', StringComparison.Ordinal)
+            || route.Contains("//", StringComparison.Ordinal)
+            || route.Contains("%2e", StringComparison.OrdinalIgnoreCase)
+            || route.Contains("%2f", StringComparison.OrdinalIgnoreCase)
+            || route.Contains("%5c", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>
