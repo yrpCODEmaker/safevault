@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self';">
+    <title>SafeVault - User Registration</title>
+</head>
+<body>
+    <main>
+        <h1>SafeVault</h1>
+        <form action="/submit" method="post" accept-charset="UTF-8">
+            <label for="username">Username:</label>
+            <input
+                type="text"
+                id="username"
+                name="username"
+                required
+                minlength="3"
+                maxlength="50"
+                pattern="[a-zA-Z0-9_.\-]{3,50}"
+                autocomplete="username"
+                title="Username must be 3 to 50 characters using letters, numbers, dots, underscores, or hyphens.">
+
+            <label for="email">Email:</label>
+            <input
+                type="email"
+                id="email"
+                name="email"
+                required
+                maxlength="100"
+                autocomplete="email">
+
+            <button type="submit">Submit</button>
+        </form>
+    </main>
+</body>
+</html>

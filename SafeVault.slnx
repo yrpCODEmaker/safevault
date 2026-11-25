@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/SafeVault/SafeVault.csproj" />
+  </Folder>
+  <Folder Name="/Tests/">
+    <Project Path="Tests/SafeVault.Tests.csproj" />
+  </Folder>
+</Solution>
